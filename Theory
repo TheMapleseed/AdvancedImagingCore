@@ -1,0 +1,79 @@
+
+// Extended decoder structure
+typedef struct VideoProcessor {
+    VideoDecoder decoder;
+    // Neural Engine interface
+    void *neuralContext;  // ANE context
+    CVMetalTextureRef inputTexture;
+    CVMetalTextureRef outputTexture;
+    // Pipeline state
+    MTLComputePipelineState *computePipeline;
+    id<MLComputeDevice> mlDevice;
+} VideoProcessor;
+```
+
+Swift/Metal integration for Neural Engine:
+```swift
+class VideoNeuralProcessor {
+    private let neuralEngine: MLComputeDevice?
+    private let metalDevice: MTLDevice
+    private var mlModel: MLModel?
+    
+    init() {
+        self.metalDevice = MTLCreateSystemDefaultDevice()!
+        // Prioritize Neural Engine
+        let config = MLModelConfiguration()
+        config.computeUnits = .all  // Uses Neural Engine when available
+        
+        // Pipeline for multi-step edits
+        let pipeline = MLPipeline {
+            // Example multi-step edit pipeline
+            stage("frameAnalysis") { input in
+                // Frame analysis model
+                return try modelA.prediction(input)
+            }
+            
+            stage("editGeneration") { input in
+                // Edit generation model
+                return try modelB.prediction(input)
+            }
+            
+            stage("qualityEnhancement") { input in
+                // Quality enhancement model
+                return try modelC.prediction(input)
+            }
+        }
+    }
+    
+    func processFrame(_ frame: CVPixelBuffer) async throws -> CVPixelBuffer {
+        // Convert to ML input
+        let input = try MLFeatureValue(pixelBuffer: frame)
+        
+        // Process through Neural Engine
+        let result = try await pipeline.predict(input)
+        
+        // Back to Metal for final processing
+        return convertToPixelBuffer(result)
+    }
+}
+```
+
+Integration with video processing:
+```c
+void process_frame_with_neural(VideoProcessor *proc) {
+    AVFrame *frame = get_next_frame(&proc->decoder);
+    
+    // Convert to Metal texture
+    CVMetalTextureRef metalTexture;
+    CVMetalTextureCacheCreateTextureFromImage(
+        kCFAllocatorDefault,
+        proc->textureCache,
+        frame->data[0],
+        NULL,
+        MTLPixelFormatBGRA8Unorm,
+        frame->width,
+        frame->height,
+        0,
+        &metalTexture
+    );
+    
